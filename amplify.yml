@@ -3,6 +3,8 @@ frontend:
   phases:
     preBuild:
       commands:
+        # Install pnpm globally using npm
+        - npm install -g pnpm
         # Use pnpm to install dependencies
         - pnpm install
     build:
