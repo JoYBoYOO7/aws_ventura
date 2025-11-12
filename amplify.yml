@@ -1,18 +1,15 @@
-# /amplify.yml
 version: 1
 frontend:
   phases:
     preBuild:
       commands:
-        - npm install -g pnpm
-        - pnpm install --frozen-lockfile
+        # 1. This command installs the pnpm tool itself in the build environment.
+        - npm install -g pnpm 
+        # 2. This command uses pnpm to install your project's dependencies correctly.
+        - pnpm install --frozen-lockfile 
     build:
       commands:
+        # 3. This command uses pnpm to build your Next.js app.
         - pnpm run build
   artifacts:
-    baseDirectory: .next
-    files:
-      - '**/*'
-  cache:
-    paths:
-      - node_modules/.pnpm-store/**/*
+    # ... (Tells Amplify where to find the build output)
