@@ -1,0 +1,70 @@
+name: Build and Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main # Or whichever branch you deploy from
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: 3. Set up pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8 # Or your specific pnpm version
+          run_install: true # Runs 'pnpm install'
+
+      - name: 4. Build Next.js App
+        run: pnpm build
+
+      - name: 5. Create .env file for deployment
+        # This file will be rsync'd to the server
+        run: echo "${{ secrets.ENV_FILE }}" > .env
+
+      - name: 6. Install SSH Key
+        # This action securely loads the private key for rsync/ssh
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_KEY }}
+
+      - name: 7. Deploy to EC2 with rsync
+        # rsync is fast as it only copies changed files
+        # It excludes node_modules and .git
+        run: |
+          rsync -avz \
+            --exclude 'node_modules' \
+            --exclude '.git' \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            . \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/ventura-app/
+
+      - name: 8. Run Remote SSH Commands
+        # This action logs into the server and runs the final commands
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            # Navigate to the app directory
+            cd /var/www/ventura-app
+            
+            # Source bashrc to get pnpm in path
+            source /home/ubuntu/.bashrc
+            
+            # Install production-only dependencies
+            pnpm install --prod
+            
+            # Reload the app with PM2 for zero-downtime
+            # If 'Ventura' isn't running, it will start it
+            pm2 reload ecosystem.config.js || pm2 start ecosystem.config.js
